@@ -1,5 +1,5 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 
 // Why this fail lands: it opens as an ordinary loving text to a spouse,
 // then the single wrong word flips the whole meaning — "love" becomes
@@ -29,9 +29,29 @@ function validate(text: string): void {
   }
 }
 
+// Resolve where entry.txt goes: $MAKEFUN_OUTPUT_DIR first (the grader and
+// the kit harness set it to their writable output directory), then the
+// legacy $OUTPUT_PATH override, then /output when running inside the grader
+// container (MAKEFUN_BOT_DIR set), then a local output/ next to this file
+// for runs on a dev machine. The entry text is unchanged by this.
+function resolveOutputPath(): string {
+  const fromEnv = process.env.MAKEFUN_OUTPUT_DIR;
+  if (fromEnv !== undefined && fromEnv.trim() !== "") {
+    return join(fromEnv, "entry.txt");
+  }
+  const legacy = process.env.OUTPUT_PATH;
+  if (legacy !== undefined && legacy.trim() !== "") {
+    return legacy;
+  }
+  if (process.env.MAKEFUN_BOT_DIR !== undefined) {
+    return "/output/entry.txt";
+  }
+  return join(process.cwd(), "output", "entry.txt");
+}
+
 function main(): void {
   validate(LINE);
-  const outPath = process.env.OUTPUT_PATH ?? "/output/entry.txt";
+  const outPath = resolveOutputPath();
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, LINE, "utf8");
   const back = readFileSync(outPath, "utf8");
